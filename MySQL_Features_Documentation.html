@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>MySQL Features in Relationship Advice Website</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: #fff;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #2980b9;
+            margin-top: 30px;
+        }
+        h3 {
+            color: #3498db;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            border: 1px solid #e9ecef;
+        }
+        code {
+            font-family: 'Courier New', Courier, monospace;
+        }
+        ul {
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 5px;
+        }
+        .key-features {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-left: 4px solid #3498db;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>MySQL Features in Relationship Advice Website</h1>
+
+    <h2>Database Configuration</h2>
+    <pre><code>app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql://{Config.MYSQL_USER}:{Config.MYSQL_PASSWORD}@{Config.MYSQL_HOST}/{Config.MYSQL_DB}'</code></pre>
+    <ul>
+        <li>Uses MySQL as the primary database</li>
+        <li>Implements secure configuration using environment variables</li>
+        <li>Establishes connection using SQLAlchemy ORM</li>
+    </ul>
+
+    <h2>Database Models</h2>
+
+    <h3>1. User Model</h3>
+    <pre><code>class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(120), nullable=False)
+    advices = db.relationship('Advice', backref='author', lazy=True)</code></pre>
+    <div class="key-features">
+        <strong>Key Features:</strong>
+        <ul>
+            <li>Primary Key auto-increment</li>
+            <li>Unique constraint on username</li>
+            <li>Not null constraints</li>
+            <li>One-to-Many relationship with Advice table</li>
+            <li>Password hashing for security</li>
+        </ul>
+    </div>
+
+    <h3>2. Advice Model</h3>
+    <pre><code>class Advice(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    question = db.Column(db.Text, nullable=False)
+    response = db.Column(db.Text, nullable=False)
+    mode = db.Column(db.String(20), nullable=False, default='savage')
+    likes = db.Column(db.Integer, default=0)
+    dislikes = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)</code></pre>
+    <div class="key-features">
+        <strong>Key Features:</strong>
+        <ul>
+            <li>Primary Key auto-increment</li>
+            <li>Text fields for long content</li>
+            <li>Default values</li>
+            <li>Foreign Key relationship with User table</li>
+            <li>Timestamp for creation time</li>
+            <li>Counter fields for likes/dislikes</li>
+        </ul>
+    </div>
+
+    <h3>3. UserVote Model</h3>
+    <pre><code>class UserVote(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    advice_id = db.Column(db.Integer, db.ForeignKey('advice.id'), nullable=False)
+    vote_type = db.Column(db.Enum('like', 'dislike'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)</code></pre>
+    <div class="key-features">
+        <strong>Key Features:</strong>
+        <ul>
+            <li>Composite relationship using multiple Foreign Keys</li>
+            <li>ENUM type for vote categorization</li>
+            <li>Timestamp tracking</li>
+        </ul>
+    </div>
+
+    <h2>Key MySQL Operations Used</h2>
+
+    <h3>1. Query Operations</h3>
+    <pre><code># Filter by user
+user_advices = Advice.query.filter_by(user_id=current_user.id).order_by(Advice.created_at.desc()).all()
+
+# Filter by mode with sorting
+top_advices = Advice.query.filter_by(mode=mode).order_by(Advice.likes.desc()).limit(10).all()
+
+# Complex query with multiple conditions
+existing_vote = UserVote.query.filter_by(user_id=current_user.id, advice_id=advice_id).first()</code></pre>
+
+    <h3>2. Data Manipulation Operations</h3>
+    <pre><code># Insert operation
+db.session.add(user)
+db.session.add(advice)
+db.session.add(new_vote)
+
+# Update operation
+advice.likes += 1
+advice.dislikes -= 1
+existing_vote.vote_type = 'like'
+
+# Commit changes
+db.session.commit()</code></pre>
+
+    <h2>Database Features Utilized</h2>
+
+    <h3>1. Relationships</h3>
+    <ul>
+        <li>One-to-Many (User to Advice)</li>
+        <li>Many-to-Many (Users and Advice through UserVote)</li>
+    </ul>
+
+    <h3>2. Constraints</h3>
+    <ul>
+        <li>Primary Keys</li>
+        <li>Foreign Keys</li>
+        <li>Unique Constraints</li>
+        <li>Not Null Constraints</li>
+        <li>Default Values</li>
+        <li>ENUM Constraints</li>
+    </ul>
+
+    <h3>3. Data Types</h3>
+    <ul>
+        <li>Integer (for IDs and counters)</li>
+        <li>String/VARCHAR (for usernames and modes)</li>
+        <li>Text (for questions and responses)</li>
+        <li>DateTime (for timestamps)</li>
+        <li>ENUM (for vote types)</li>
+    </ul>
+
+    <h3>4. Indexing</h3>
+    <ul>
+        <li>Automatic indexing on Primary Keys</li>
+        <li>Foreign Key indexing</li>
+        <li>Unique index on username</li>
+    </ul>
+
+    <h3>5. Query Features</h3>
+    <ul>
+        <li>Filtering (WHERE clause via filter_by)</li>
+        <li>Sorting (ORDER BY via order_by)</li>
+        <li>Limiting results (LIMIT via limit)</li>
+        <li>Joining tables (automatic through relationships)</li>
+    </ul>
+
+    <h2>Best Practices Implemented</h2>
+
+    <h3>1. Security</h3>
+    <ul>
+        <li>Password hashing</li>
+        <li>Environment variables for credentials</li>
+        <li>No raw SQL queries (prevents SQL injection)</li>
+    </ul>
+
+    <h3>2. Performance</h3>
+    <ul>
+        <li>Proper indexing</li>
+        <li>Relationship lazy loading</li>
+        <li>Query optimization</li>
+    </ul>
+
+    <h3>3. Data Integrity</h3>
+    <ul>
+        <li>Foreign key constraints</li>
+        <li>Not null constraints</li>
+        <li>Default values</li>
+        <li>Transaction management</li>
+    </ul>
+
+    <h3>4. Scalability</h3>
+    <ul>
+        <li>Proper relationship modeling</li>
+        <li>Efficient query patterns</li>
+        <li>Modular database design</li>
+    </ul>
+</body>
+</html> 

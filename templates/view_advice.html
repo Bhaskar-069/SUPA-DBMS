@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Your Advice{% endblock %}
+
+{% block content %}
+<div class="card advice-card">
+    <div class="card-body">
+        <div class="advice-header">
+            <h2>Your Question:</h2>
+            <p class="question">{{ advice.question }}</p>
+        </div>
+        
+        <div class="advice-content">
+            <h3>Advice ({{ advice.mode|title }} Mode):</h3>
+            <p class="response">{{ advice.response }}</p>
+        </div>
+        
+        <div class="advice-footer">
+            <div class="vote-buttons">
+                <button onclick="vote({{ advice.id }}, 'like')" class="btn btn-vote">
+                    👍 <span id="likes-{{ advice.id }}">{{ advice.likes }}</span>
+                </button>
+                <button onclick="vote({{ advice.id }}, 'dislike')" class="btn btn-vote">
+                    👎 <span id="dislikes-{{ advice.id }}">{{ advice.dislikes }}</span>
+                </button>
+            </div>
+            <div class="advice-actions">
+                <a href="{{ url_for('ask_advice') }}" class="btn btn-primary">Ask Another Question</a>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">View All Advice</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function vote(adviceId, action) {
+    fetch(`/vote/${adviceId}/${action}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.likes !== undefined) {
+                document.getElementById(`likes-${adviceId}`).textContent = data.likes;
+                document.getElementById(`dislikes-${adviceId}`).textContent = data.dislikes;
+            }
+        });
+}
+</script>
+{% endblock %} 

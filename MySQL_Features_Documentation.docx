@@ -1,0 +1,145 @@
+# MySQL Features in Relationship Advice Website
+
+## Database Configuration
+```python
+app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql://{Config.MYSQL_USER}:{Config.MYSQL_PASSWORD}@{Config.MYSQL_HOST}/{Config.MYSQL_DB}'
+```
+- Uses MySQL as the primary database
+- Implements secure configuration using environment variables
+- Establishes connection using SQLAlchemy ORM
+
+## Database Models
+
+### 1. User Model
+```python
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(120), nullable=False)
+    advices = db.relationship('Advice', backref='author', lazy=True)
+```
+Key Features:
+- Primary Key auto-increment
+- Unique constraint on username
+- Not null constraints
+- One-to-Many relationship with Advice table
+- Password hashing for security
+
+### 2. Advice Model
+```python
+class Advice(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    question = db.Column(db.Text, nullable=False)
+    response = db.Column(db.Text, nullable=False)
+    mode = db.Column(db.String(20), nullable=False, default='savage')
+    likes = db.Column(db.Integer, default=0)
+    dislikes = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+```
+Key Features:
+- Primary Key auto-increment
+- Text fields for long content
+- Default values
+- Foreign Key relationship with User table
+- Timestamp for creation time
+- Counter fields for likes/dislikes
+
+### 3. UserVote Model
+```python
+class UserVote(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    advice_id = db.Column(db.Integer, db.ForeignKey('advice.id'), nullable=False)
+    vote_type = db.Column(db.Enum('like', 'dislike'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+```
+Key Features:
+- Composite relationship using multiple Foreign Keys
+- ENUM type for vote categorization
+- Timestamp tracking
+
+## Key MySQL Operations Used
+
+### 1. Query Operations
+```python
+# Filter by user
+user_advices = Advice.query.filter_by(user_id=current_user.id).order_by(Advice.created_at.desc()).all()
+
+# Filter by mode with sorting
+top_advices = Advice.query.filter_by(mode=mode).order_by(Advice.likes.desc()).limit(10).all()
+
+# Complex query with multiple conditions
+existing_vote = UserVote.query.filter_by(user_id=current_user.id, advice_id=advice_id).first()
+```
+
+### 2. Data Manipulation Operations
+```python
+# Insert operation
+db.session.add(user)
+db.session.add(advice)
+db.session.add(new_vote)
+
+# Update operation
+advice.likes += 1
+advice.dislikes -= 1
+existing_vote.vote_type = 'like'
+
+# Commit changes
+db.session.commit()
+```
+
+## Database Features Utilized
+
+1. **Relationships**
+   - One-to-Many (User to Advice)
+   - Many-to-Many (Users and Advice through UserVote)
+
+2. **Constraints**
+   - Primary Keys
+   - Foreign Keys
+   - Unique Constraints
+   - Not Null Constraints
+   - Default Values
+   - ENUM Constraints
+
+3. **Data Types**
+   - Integer (for IDs and counters)
+   - String/VARCHAR (for usernames and modes)
+   - Text (for questions and responses)
+   - DateTime (for timestamps)
+   - ENUM (for vote types)
+
+4. **Indexing**
+   - Automatic indexing on Primary Keys
+   - Foreign Key indexing
+   - Unique index on username
+
+5. **Query Features**
+   - Filtering (WHERE clause via filter_by)
+   - Sorting (ORDER BY via order_by)
+   - Limiting results (LIMIT via limit)
+   - Joining tables (automatic through relationships)
+
+## Best Practices Implemented
+
+1. **Security**
+   - Password hashing
+   - Environment variables for credentials
+   - No raw SQL queries (prevents SQL injection)
+
+2. **Performance**
+   - Proper indexing
+   - Relationship lazy loading
+   - Query optimization
+
+3. **Data Integrity**
+   - Foreign key constraints
+   - Not null constraints
+   - Default values
+   - Transaction management
+
+4. **Scalability**
+   - Proper relationship modeling
+   - Efficient query patterns
+   - Modular database design 

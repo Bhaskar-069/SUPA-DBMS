@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relationship Advices - {% block title %}{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <nav class="nav">
+        {% if current_user.is_authenticated %}
+            <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
+            <a href="{{ url_for('profile') }}" class="nav-link">Profile</a>
+            <a href="{{ url_for('ask_advice') }}" class="nav-link">Ask Advice</a>
+            <a href="{{ url_for('logout') }}" class="nav-link">Logout</a>
+        {% else %}
+            <a href="{{ url_for('login') }}" class="nav-link login-btn">Login</a>
+            <a href="{{ url_for('register') }}" class="nav-link register-btn">Register Here</a>
+        {% endif %}
+    </nav>
+
+    <div class="container">
+        <h1 class="site-title">Relationship Advices</h1>
+        
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="flash">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html> 

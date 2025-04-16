@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2>Top Advice</h2>
+        <div class="float-end">
+            <a href="{{ url_for('ask_advice') }}" class="btn btn-primary">Ask for Advice</a>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Filter by Mode</h5>
+                <div class="mode-filters">
+                    <a href="{{ url_for('dashboard', mode='all') }}" 
+                       class="btn btn-primary {% if current_mode == 'all' %}active{% endif %}">
+                        All
+                    </a>
+                    {% for mode in modes %}
+                    <a href="{{ url_for('dashboard', mode=mode) }}" 
+                       class="btn btn-primary {% if current_mode == mode %}active{% endif %}">
+                        {{ mode|title }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="advice-list">
+    {% for advice in advices %}
+    <div class="card advice-card">
+        <div class="card-header">
+            <span class="badge badge-{{ advice.mode }}">{{ advice.mode|title }}</span>
+            <div class="vote-count">
+                <button class="vote-btn" onclick="vote({{ advice.id }}, 'like')">
+                    👍 <span id="likes-{{ advice.id }}">{{ advice.likes }}</span>
+                </button>
+                <button class="vote-btn" onclick="vote({{ advice.id }}, 'dislike')">
+                    👎 <span id="dislikes-{{ advice.id }}">{{ advice.dislikes }}</span>
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <h5 class="card-title">Question:</h5>
+            <p class="card-text">{{ advice.question }}</p>
+            <h5 class="card-title">Response:</h5>
+            <p class="card-text">{{ advice.response }}</p>
+            <small class="text-muted">Asked by {{ advice.author.username }}</small>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function vote(adviceId, action) {
+    fetch(`/vote/${adviceId}/${action}`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById(`likes-${adviceId}`).textContent = data.likes;
+            document.getElementById(`dislikes-${adviceId}`).textContent = data.dislikes;
+        });
+}
+</script>
+{% endblock %} 

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Your Profile{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <div class="profile-header">
+        <h2>Welcome, {{ user.username }}!</h2>
+        <div class="profile-stats">
+            <div class="stat-card">
+                <span class="stat-number">{{ advices|length }}</span>
+                <span class="stat-label">Total Advice Requests</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="advice-history">
+        <h3>Your Advice History</h3>
+        {% if advices %}
+            <div class="advice-list">
+                {% for advice in advices %}
+                <div class="advice-card">
+                    <div class="advice-header">
+                        <span class="badge badge-{{ advice.mode }}">{{ advice.mode|title }}</span>
+                        <span class="advice-date">{{ advice.created_at.strftime('%B %d, %Y') }}</span>
+                    </div>
+                    
+                    <div class="advice-content">
+                        <div class="question-section">
+                            <h4>Your Question:</h4>
+                            <p>{{ advice.question }}</p>
+                        </div>
+                        
+                        <div class="response-section">
+                            <h4>Advice:</h4>
+                            <p>{{ advice.response }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="advice-footer">
+                        <div class="vote-stats">
+                            <span class="likes">👍 {{ advice.likes }}</span>
+                            <span class="dislikes">👎 {{ advice.dislikes }}</span>
+                        </div>
+                        <a href="{{ url_for('view_advice', advice_id=advice.id) }}" class="btn btn-secondary">View Full Advice</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="no-advice">
+                <p>You haven't asked for any advice yet.</p>
+                <a href="{{ url_for('ask_advice') }}" class="btn btn-primary">Ask Your First Question</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Ask for Advice{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        <form method="POST">
+            <div class="form-group">
+                <label for="mode">Choose Advice Mode:</label>
+                <select name="mode" id="mode" class="form-control">
+                    {% for mode in modes %}
+                    <option value="{{ mode }}">{{ mode|title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="question">What's on your mind?</label>
+                <textarea name="question" id="question" class="form-control" rows="4" required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Get Advice</button>
+        </form>
+    </div>
+</div>
+{% endblock %} 
