@@ -1,17 +1,23 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
-from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 import cohere
 from config import Config
-import mysql.connector
+from supabase import create_client, Client
 from datetime import datetime
 
 app = Flask(__name__)
 app.config.from_object(Config)
 
+# Initialize Supabase client
+supabase: Client = create_client(Config.SUPABASE_URL, Config.SUPABASE_KEY)
+
 # Initialize Cohere client
 co = cohere.Client(Config.COHERE_API_KEY)
+
+# Initialize Login Manager
+login_manager = LoginManager(app)
+login_manager.login_view = 'login'
 
 # Define advice modes with spicier prompts
 ADVICE_MODES = {
@@ -47,9 +53,6 @@ ADVICE_MODES = {
 # Database configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql://{Config.MYSQL_USER}:{Config.MYSQL_PASSWORD}@{Config.MYSQL_HOST}/{Config.MYSQL_DB}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
-login_manager = LoginManager(app)
-login_manager.login_view = 'login'
 
 # Database Models
 class User(UserMixin, db.Model):
