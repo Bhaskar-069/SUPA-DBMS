@@ -9,8 +9,18 @@ from datetime import datetime
 app = Flask(__name__)
 app.config.from_object(Config)
 
-# Initialize Supabase client
-supabase: Client = create_client(Config.SUPABASE_URL, Config.SUPABASE_KEY)
+# Initialize Supabase client with options to disable proxy
+supabase: Client = create_client(
+    Config.SUPABASE_URL, 
+    Config.SUPABASE_KEY,
+    options={
+        "auth": {
+            "autoRefreshToken": True,
+            "persistSession": True,
+            "detectSessionInUrl": False
+        }
+    }
+)
 
 # Initialize Cohere client
 co = cohere.Client(Config.COHERE_API_KEY)
