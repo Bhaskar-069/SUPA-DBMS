@@ -50,39 +50,22 @@ ADVICE_MODES = {
                    For this friend seeking guidance: """
 }
 
-# Database configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql://{Config.MYSQL_USER}:{Config.MYSQL_PASSWORD}@{Config.MYSQL_HOST}/{Config.MYSQL_DB}'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# Database Models
-class User(UserMixin, db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    password_hash = db.Column(db.String(120), nullable=False)
-    advices = db.relationship('Advice', backref='author', lazy=True)
-
-class Advice(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    question = db.Column(db.Text, nullable=False)
-    response = db.Column(db.Text, nullable=False)
-    mode = db.Column(db.String(20), nullable=False, default='savage')
-    likes = db.Column(db.Integer, default=0)
-    dislikes = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-
-class UserVote(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    advice_id = db.Column(db.Integer, db.ForeignKey('advice.id'), nullable=False)
-    vote_type = db.Column(db.Enum('like', 'dislike'), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+class User(UserMixin):
+    def __init__(self, id, username):
+        self.id = id
+        self.username = username
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    try:
+        response = supabase.table('users').select('*').eq('id', user_id).execute()
+        if response.data:
+            user_data = response.data[0]
+            return User(user_data['id'], user_data['username'])
+    except Exception as e:
+        print(f"Error loading user: {e}")
+    return None
 
-# Routes
 @app.route('/')
 def index():
     if current_user.is_authenticated:
@@ -94,12 +77,19 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        user = User.query.filter_by(username=username).first()
         
-        if user and check_password_hash(user.password_hash, password):
-            login_user(user)
-            return redirect(url_for('dashboard'))
-        flash('Invalid username or password')
+        try:
+            response = supabase.table('users').select('*').eq('username', username).execute()
+            if response.data:
+                user_data = response.data[0]
+                if check_password_hash(user_data['password_hash'], password):
+                    user = User(user_data['id'], user_data['username'])
+                    login_user(user)
+                    return redirect(url_for('dashboard'))
+            flash('Invalid username or password')
+        except Exception as e:
+            print(f"Login error: {e}")
+            flash('An error occurred during login')
     return render_template('login.html')
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -108,25 +98,39 @@ def register():
         username = request.form.get('username')
         password = request.form.get('password')
         
-        if User.query.filter_by(username=username).first():
-            flash('Username already exists')
-            return redirect(url_for('register'))
-        
-        user = User(username=username, password_hash=generate_password_hash(password))
-        db.session.add(user)
-        db.session.commit()
-        return redirect(url_for('login'))
+        try:
+            # Check if username exists
+            response = supabase.table('users').select('*').eq('username', username).execute()
+            if response.data:
+                flash('Username already exists')
+                return redirect(url_for('register'))
+            
+            # Create new user
+            user_data = {
+                'username': username,
+                'password_hash': generate_password_hash(password)
+            }
+            response = supabase.table('users').insert(user_data).execute()
+            return redirect(url_for('login'))
+        except Exception as e:
+            print(f"Registration error: {e}")
+            flash('An error occurred during registration')
     return render_template('register.html')
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
     mode = request.args.get('mode', 'all')
-    if mode != 'all':
-        top_advices = Advice.query.filter_by(mode=mode).order_by(Advice.likes.desc()).limit(10).all()
-    else:
-        top_advices = Advice.query.order_by(Advice.likes.desc()).limit(10).all()
-    return render_template('dashboard.html', advices=top_advices, current_mode=mode, modes=ADVICE_MODES.keys())
+    try:
+        if mode != 'all':
+            response = supabase.table('advice').select('*').eq('mode', mode).order('likes', desc=True).limit(10).execute()
+        else:
+            response = supabase.table('advice').select('*').order('likes', desc=True).limit(10).execute()
+        advices = response.data
+    except Exception as e:
+        print(f"Dashboard error: {e}")
+        advices = []
+    return render_template('dashboard.html', advices=advices, current_mode=mode, modes=ADVICE_MODES.keys())
 
 @app.route('/ask_advice', methods=['GET', 'POST'])
 @login_required
@@ -135,7 +139,7 @@ def ask_advice():
         question = request.form.get('question')
         mode = request.form.get('mode', 'savage')
         
-        # Generate advice using Cohere with improved prompts
+        # Generate advice using Cohere
         prompt = ADVICE_MODES[mode] + question
         response = co.generate(
             model='command',
@@ -150,68 +154,95 @@ def ask_advice():
         
         advice_response = response.generations[0].text.strip()
         
-        # Save to database
-        advice = Advice(
-            question=question,
-            response=advice_response,
-            mode=mode,
-            user_id=current_user.id
-        )
-        db.session.add(advice)
-        db.session.commit()
-        
-        return redirect(url_for('view_advice', advice_id=advice.id))
+        try:
+            # Save to Supabase
+            advice_data = {
+                'question': question,
+                'response': advice_response,
+                'mode': mode,
+                'user_id': current_user.id,
+                'likes': 0,
+                'dislikes': 0,
+                'created_at': datetime.utcnow().isoformat()
+            }
+            response = supabase.table('advice').insert(advice_data).execute()
+            advice_id = response.data[0]['id']
+            return redirect(url_for('view_advice', advice_id=advice_id))
+        except Exception as e:
+            print(f"Error saving advice: {e}")
+            flash('An error occurred while saving your advice')
     return render_template('ask_advice.html', modes=ADVICE_MODES.keys())
 
 @app.route('/view_advice/<int:advice_id>')
 @login_required
 def view_advice(advice_id):
-    advice = Advice.query.get_or_404(advice_id)
-    return render_template('view_advice.html', advice=advice)
+    try:
+        response = supabase.table('advice').select('*').eq('id', advice_id).execute()
+        if response.data:
+            advice = response.data[0]
+            return render_template('view_advice.html', advice=advice)
+        flash('Advice not found')
+    except Exception as e:
+        print(f"Error viewing advice: {e}")
+        flash('An error occurred while viewing the advice')
+    return redirect(url_for('dashboard'))
 
 @app.route('/vote/<int:advice_id>/<action>')
 @login_required
 def vote(advice_id, action):
-    advice = Advice.query.get_or_404(advice_id)
-    existing_vote = UserVote.query.filter_by(
-        user_id=current_user.id,
-        advice_id=advice_id
-    ).first()
-    
-    if existing_vote:
-        if existing_vote.vote_type == action:
-            return jsonify({'message': 'Already voted'})
+    try:
+        # Get the advice
+        advice_response = supabase.table('advice').select('*').eq('id', advice_id).execute()
+        if not advice_response.data:
+            return jsonify({'message': 'Advice not found'})
         
-        # Change vote
-        if action == 'like':
-            advice.dislikes -= 1
-            advice.likes += 1
-            existing_vote.vote_type = 'like'
-        else:
-            advice.likes -= 1
-            advice.dislikes += 1
-            existing_vote.vote_type = 'dislike'
-    else:
-        # New vote
-        if action == 'like':
-            advice.likes += 1
-            vote_type = 'like'
-        else:
-            advice.dislikes += 1
-            vote_type = 'dislike'
+        advice = advice_response.data[0]
         
-        new_vote = UserVote(
-            user_id=current_user.id,
-            advice_id=advice_id,
-            vote_type=vote_type
-        )
-        db.session.add(new_vote)
-    
-    db.session.commit()
-    return jsonify({
-        'likes': advice.likes,
-        'dislikes': advice.dislikes
-    })
+        # Check for existing vote
+        vote_response = supabase.table('user_votes').select('*').eq('user_id', current_user.id).eq('advice_id', advice_id).execute()
+        
+        if vote_response.data:
+            existing_vote = vote_response.data[0]
+            if existing_vote['vote_type'] == action:
+                return jsonify({'message': 'Already voted'})
+            
+            # Update existing vote
+            if action == 'like':
+                advice['dislikes'] -= 1
+                advice['likes'] += 1
+            else:
+                advice['likes'] -= 1
+                advice['dislikes'] += 1
+            
+            supabase.table('user_votes').update({'vote_type': action}).eq('id', existing_vote['id']).execute()
+        else:
+            # Create new vote
+            if action == 'like':
+                advice['likes'] += 1
+            else:
+                advice['dislikes'] += 1
+            
+            vote_data = {
+                'user_id': current_user.id,
+                'advice_id': advice_id,
+                'vote_type': action,
+                'created_at': datetime.utcnow().isoformat()
+            }
+            supabase.table('user_votes').insert(vote_data).execute()
+        
+        # Update advice likes/dislikes
+        supabase.table('advice').update({
+            'likes': advice['likes'],
+            'dislikes': advice['dislikes']
+        }).eq('id', advice_id).execute()
+        
+        return jsonify({
+            'likes': advice['likes'],
+            'dislikes': advice['dislikes']
+        })
+    except Exception as e:
+        print(f"Voting error: {e}")
+        return jsonify({'message': 'An error occurred while voting'})
 
 @app.route('/logout')
 @login_required
@@ -222,11 +253,14 @@ def logout():
 @app.route('/profile')
 @login_required
 def profile():
-    # Get all advice entries for the current user, ordered by most recent first
-    user_advices = Advice.query.filter_by(user_id=current_user.id).order_by(Advice.created_at.desc()).all()
+    try:
+        # Get all advice entries for the current user, ordered by most recent first
+        response = supabase.table('advice').select('*').eq('user_id', current_user.id).order('created_at', desc=True).execute()
+        user_advices = response.data
+    except Exception as e:
+        print(f"Profile error: {e}")
+        user_advices = []
     return render_template('profile.html', user=current_user, advices=user_advices)
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
     app.run(host='0.0.0.0', port=5000, debug=True) 
